@@ -52,6 +52,8 @@ public class MasterListFragment extends Fragment {
         return view;
     }
 
+    // check if activity has implemented required method of interface
+    // if not, show exception
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);

@@ -20,6 +20,7 @@ public class MainActivity extends AppCompatActivity implements MasterListFragmen
         setContentView(R.layout.activity_main);
     }
 
+    // implement method of interface
     @Override
     public void OnImageSelected(int position) {
 
@@ -46,7 +47,7 @@ public class MainActivity extends AppCompatActivity implements MasterListFragmen
          bundle.putInt("legIndex", legIndex);
 
         final Intent intent = new Intent(this, AndroidMeActivity.class);
-         intent.putExtras(bundle);
+        intent.putExtras(bundle);
 
         Button button = (Button) findViewById(R.id.button_next);
         button.setOnClickListener(new View.OnClickListener() {
