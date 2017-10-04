@@ -22,18 +22,21 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import com.google.android.gms.location.places.PlaceBuffer;
 
 public class PlaceListAdapter extends RecyclerView.Adapter<PlaceListAdapter.PlaceViewHolder> {
 
     private Context mContext;
+    private PlaceBuffer mPlaceBuffer;
 
     /**
-     * Constructor using the context and the db cursor
+     * Constructor using the context and the place buffer
      *
      * @param context the calling context/activity
      */
-    public PlaceListAdapter(Context context) {
+    public PlaceListAdapter(Context context, PlaceBuffer placeBuffer) {
         this.mContext = context;
+        this.mPlaceBuffer = placeBuffer;
     }
 
     /**
@@ -52,7 +55,7 @@ public class PlaceListAdapter extends RecyclerView.Adapter<PlaceListAdapter.Plac
     }
 
     /**
-     * Binds the data from a particular position in the cursor to the corresponding view holder
+     * Binds the data from a particular position in the place buffer to the corresponding view holder
      *
      * @param holder   The PlaceViewHolder instance corresponding to the required position
      * @param position The current position that needs to be loaded with data
@@ -60,17 +63,32 @@ public class PlaceListAdapter extends RecyclerView.Adapter<PlaceListAdapter.Plac
     @Override
     public void onBindViewHolder(PlaceViewHolder holder, int position) {
 
+        // get place name and address from place buffer and set text of textviews accordingly
+        String placeName = mPlaceBuffer.get(position).getName().toString();
+        String placeAddress = mPlaceBuffer.get(position).getAddress().toString();
+        holder.nameTextView.setText(placeName);
+        holder.addressTextView.setText(placeAddress);
+
     }
 
-
     /**
-     * Returns the number of items in the cursor
+     * Returns the number of items in the place buffer
      *
-     * @return Number of items in the cursor, or 0 if null
+     * @return Number of items in the place buffer, or 0 if null
      */
     @Override
     public int getItemCount() {
-        return 0;
+        if (mPlaceBuffer == null) return 0;
+        return mPlaceBuffer.getCount();
+    }
+
+    // update place buffer with new places
+    public void swapPlaces (PlaceBuffer placeBuffer){
+        mPlaceBuffer = placeBuffer;
+        if (mPlaceBuffer != null)
+            // force the recyclerview to refresh
+                this.notifyDataSetChanged();
+
     }
 
     /**

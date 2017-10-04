@@ -18,7 +18,12 @@ package com.example.android.shushme;
 
 import android.Manifest;
 import android.Manifest.permission;
+import android.app.PendingIntent;
+import android.content.ContentValues;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -33,10 +38,21 @@ import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.Toast;
+import com.example.android.shushme.provider.PlaceContract;
+import com.example.android.shushme.provider.PlaceContract.PlaceEntry;
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
+import com.google.android.gms.location.places.ui.PlacePicker;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
 
@@ -45,10 +61,14 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
 
     private final int MY_PERMISSIONS_REQUEST_LOCATION = 100;
 
+    // placepicket intent builder start intent request code
+    private final int PLACE_PICKER = 200;
+
     // Member variables
     private PlaceListAdapter mAdapter;
     private RecyclerView mRecyclerView;
     private CheckBox mLocationPermissionCheckbox;
+    private GoogleApiClient googleApiClient;
 
     /**
      * Called when the activity is starting
@@ -63,11 +83,11 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         // Set up the recycler view
         mRecyclerView = (RecyclerView) findViewById(R.id.places_list_recycler_view);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        mAdapter = new PlaceListAdapter(this);
+        mAdapter = new PlaceListAdapter(this, null);
         mRecyclerView.setAdapter(mAdapter);
 
         //  (4) Create a GoogleApiClient with the LocationServices API and GEO_DATA_API
-        GoogleApiClient googleApiClient = new GoogleApiClient.Builder(this)
+        googleApiClient = new GoogleApiClient.Builder(this)
             .addConnectionCallbacks(this)
             .addOnConnectionFailedListener(this)
             .addApi(Places.GEO_DATA_API)
@@ -79,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     //  (5) Override onConnected, onConnectionSuspended and onConnectionFailed for GoogleApiClient
     @Override
     public void onConnected(@Nullable Bundle bundle) {
+        refreshPlacesData();
         Log.i(TAG, "Google APi Client: connected");
     }
 
@@ -114,7 +135,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         }
     }
 
-    public void showToast(View view){
+    public void addPlaceButton(View view){
         if (ContextCompat.checkSelfPermission(this,
             permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
@@ -124,6 +145,40 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         } else {
             Toast.makeText(MainActivity.this, R.string.permission_granted, Toast.LENGTH_SHORT).show();
         }
+
+        PlacePicker.IntentBuilder intentBuilder = new PlacePicker.IntentBuilder();
+        Intent intent;
+        try {
+            intent = intentBuilder.build(this);
+            startActivityForResult(intent, PLACE_PICKER);
+        } catch (GooglePlayServicesRepairableException e) {
+            Log.i(TAG, "Google Play Services Repairable Exception");
+        } catch (GooglePlayServicesNotAvailableException e) {
+            Log.i(TAG, "Google Play Services Not Available Exception");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PLACE_PICKER && resultCode == RESULT_OK){
+                Place places = PlacePicker.getPlace(this,data);
+            if (places == null){
+                Log.i(TAG, "No place is selected");
+                return;
+            }
+
+            // extract place data from Place
+//            String placeName = places.getName().toString();
+//            String placeAddress = places.getAddress().toString();
+            String placeId = places.getId();
+
+            // save placeId in DB
+            ContentValues contentValues = new ContentValues();
+            contentValues.put(PlaceEntry.COLUMN_PLACE_ID, placeId);
+            getContentResolver().insert(PlaceEntry.CONTENT_URI, contentValues);
+        }
+
+        refreshPlacesData();
     }
 
     //  (8) Implement onLocationPermissionClicked to handle the CheckBox click event
@@ -132,6 +187,46 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         ActivityCompat.requestPermissions(this,
             new String[]{permission.ACCESS_FINE_LOCATION},
             MY_PERMISSIONS_REQUEST_LOCATION);
+    }
+
+    public void refreshPlacesData(){
+
+        Uri uri = PlaceEntry.CONTENT_URI;
+        // get all data with the given uri
+        Cursor data = getContentResolver().query(
+            uri,
+            null,
+            null,
+            null,
+            null
+        );
+
+        // if there is no data in given uri in db => return
+        if (data == null || data.getCount() == 0) return;
+
+        List<String> guide = new ArrayList<>();
+
+        // iterate through the data
+        while (data.moveToNext()){
+
+            // get 'PLACE ID' column index and get 'ID' string in this cloumn and add it to Arraylist
+            guide.add(data.getString(data.getColumnIndexOrThrow(PlaceEntry.COLUMN_PLACE_ID)));
+
+            // get the places corresponding to the ID from GeoDataApi
+            PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi.getPlaceById(
+                googleApiClient, guide.toArray(new String[guide.size()]));
+
+            // to retrieve the server's result setup the callback on PendingResult
+            placeResult.setResultCallback(new ResultCallback<PlaceBuffer>() {
+                @Override
+                // receive place in this method
+                public void onResult(@NonNull PlaceBuffer places) {
+                    // update adatper data
+                    mAdapter.swapPlaces(places);
+                }
+            });
+
+        }
     }
 
 }
