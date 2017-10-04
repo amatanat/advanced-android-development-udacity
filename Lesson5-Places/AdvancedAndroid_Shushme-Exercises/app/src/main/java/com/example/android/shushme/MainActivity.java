@@ -21,6 +21,7 @@ import android.Manifest.permission;
 import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -37,6 +38,8 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.Toast;
 import com.example.android.shushme.provider.PlaceContract;
 import com.example.android.shushme.provider.PlaceContract.PlaceEntry;
@@ -69,6 +72,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
     private RecyclerView mRecyclerView;
     private CheckBox mLocationPermissionCheckbox;
     private GoogleApiClient googleApiClient;
+    private Geofencing mGeofencing;
+    private boolean mIsEnabled;
 
     /**
      * Called when the activity is starting
@@ -86,6 +91,24 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
         mAdapter = new PlaceListAdapter(this, null);
         mRecyclerView.setAdapter(mAdapter);
 
+
+        // Initialize the switch state and Handle enable/disable switch change
+        Switch onOffSwitch = (Switch) findViewById(R.id.enable_switch);
+        mIsEnabled = getPreferences(MODE_PRIVATE).getBoolean(getString(R.string.setting_enabled), false);
+        onOffSwitch.setChecked(mIsEnabled);
+        onOffSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                SharedPreferences.Editor editor = getPreferences(MODE_PRIVATE).edit();
+                editor.putBoolean(getString(R.string.setting_enabled), isChecked);
+                mIsEnabled = isChecked;
+                editor.commit();
+                if (isChecked) mGeofencing.registerAllGeofences();
+                else mGeofencing.unregisterAllGeofences();
+            }
+
+        });
+
         //  (4) Create a GoogleApiClient with the LocationServices API and GEO_DATA_API
         googleApiClient = new GoogleApiClient.Builder(this)
             .addConnectionCallbacks(this)
@@ -94,6 +117,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
             .addApi(LocationServices.API)
             .enableAutoManage(this,this)
             .build();
+
+        mGeofencing = new Geofencing(this, googleApiClient);
     }
 
     //  (5) Override onConnected, onConnectionSuspended and onConnectionFailed for GoogleApiClient
@@ -223,6 +248,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.C
                 public void onResult(@NonNull PlaceBuffer places) {
                     // update adatper data
                     mAdapter.swapPlaces(places);
+                    mGeofencing.updateGeofencesList(places);
+                    if (mIsEnabled) mGeofencing.registerAllGeofences();
                 }
             });
 
