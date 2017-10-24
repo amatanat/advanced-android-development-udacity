@@ -21,7 +21,7 @@
         </activity>
 
         <provider
-            android:name=".provider.generated.SquawkProvider"
+            android:name="android.example.com.squawker.provider.generated.SquawkProvider"
             android:authorities="android.example.com.squawker.provider.provider"
             android:exported="false" />
 
