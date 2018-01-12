@@ -52,7 +52,7 @@ public class EspressoTestRecorderTest {
                                 1)))
                 .atPosition(2);
         linearLayout.perform(click());
-        
+
         ViewInteraction textView2 = onView(
                 allOf(withId(R.id.tea_name_text_view), withText("White Tea"),
                         childAtPosition(
